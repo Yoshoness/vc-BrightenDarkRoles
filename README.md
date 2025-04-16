@@ -1,2 +1,2 @@
 # vc-WhitenDarkRoles
-A Vencord plugin that sets hardly visible roles on usernames to white for readability.
+A Vencord plugin that sets hardly visible roles on usernames to white for readability. Based on the ircColors plugin.
