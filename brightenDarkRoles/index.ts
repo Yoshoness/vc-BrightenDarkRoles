@@ -17,7 +17,6 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { makeRange } from "@components/PluginSettings/components";
 
@@ -42,7 +41,7 @@ function luminance(r: number, g: number, b: number): number {
 
 const settings = definePluginSettings({
     SetLuminanceThreshold: {
-        description: "Set threshold of luminance to be turned to default.",
+        description: "Set threshold of luminance to be brightened.",
         type: OptionType.SLIDER,
         markers: makeRange(5, 30, 5),
         default: 15
@@ -56,7 +55,7 @@ const settings = definePluginSettings({
 });
 
 export default definePlugin({
-    name: "WhitenDarkRoles",
+    name: "BrightenDarkRoles",
     description: "Sets hardly visible roles on usernames to white for readability.",
     authors: [{ name: "Yoshoness", id: 206081832289042432n }],
     settings,
