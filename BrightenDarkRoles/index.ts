@@ -71,8 +71,8 @@ export default definePlugin({
         {
             find: "#{intl::GUILD_OWNER}),children:",
             replacement: {
-                match: /(typingIndicatorRef:.+?},)(\i=.+?)color:null!=.{0,50}?(?=,)/,
-                replace: (_, rest1, rest2) => `${rest1}whiteColor=$self.calculateNameColorForListContext(arguments[0]),${rest2}color:whiteColor`
+                match: /(?<=roleName:\i,)color:/,
+                replace: "color:$self.calculateNameColorForListContext(arguments[0]),originalColor:"
             },
             predicate: () => settings.store.memberListColors
         }
@@ -92,7 +92,7 @@ export default definePlugin({
         }
 
         return (colorString && luminance)
-            ? "ffffff"
+            ? "#ffffff"
             : colorString;
     },
     calculateNameColorForListContext(context: any) {
@@ -105,7 +105,7 @@ export default definePlugin({
         }
 
         return (colorString && luminance)
-            ? "ffffff"
+            ? "#ffffff"
             : colorString;
     }
 });
