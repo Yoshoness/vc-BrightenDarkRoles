@@ -17,6 +17,7 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
+import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { makeRange } from "@components/PluginSettings/components";
 
@@ -72,7 +73,7 @@ export default definePlugin({
             find: "#{intl::GUILD_OWNER}),children:",
             replacement: {
                 match: /(typingIndicatorRef:.+?},)(\i=.+?)color:null!=.{0,50}?(?=,)/,
-                replace: (_, rest1, rest2) => `${rest1}ircColor=$self.calculateNameColorForListContext(arguments[0]),${rest2}color:ircColor`
+                replace: (_, rest1, rest2) => `${rest1}whiteColor=$self.calculateNameColorForListContext(arguments[0]),${rest2}color:whiteColor`
             },
             predicate: () => settings.store.memberListColors
         }
