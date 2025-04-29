@@ -46,6 +46,12 @@ const settings = definePluginSettings({
         markers: makeRange(5, 30, 5),
         default: 15
     },
+    setLuminanceAmount: {
+        description: "Set the luminance the role colors should be set to.",
+        type: OptionType.SLIDER,
+        markers: makeRange(50, 90, 5),
+        default: 50
+    },
     MemberListColors: {
         description: "Replace role colors in the member list.",
         restartNeeded: true,
@@ -57,7 +63,7 @@ const settings = definePluginSettings({
 function lighten(color) {
     if (color) {
         var { hue, saturation, lightness } = hexToHSL(color);
-        const newHex = HSLToHex(hue, saturation, 50);
+        const newHex = HSLToHex(hue, saturation, settings.store.setLuminanceAmount);
         return newHex
     }
 }
@@ -185,6 +191,7 @@ export default definePlugin({
             ? newColorString
             : colorString;
     },
+
     calculateNameColorForListContext(context: any) {
         const colorString = context?.colorString;
         const luminance = calculateNameColorForUser(colorString);
@@ -198,5 +205,5 @@ export default definePlugin({
         return (colorString && luminance)
             ? newColorString
             : colorString;
-    }
+    },
 });
