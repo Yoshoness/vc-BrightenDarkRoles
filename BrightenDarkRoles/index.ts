@@ -19,6 +19,8 @@
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { makeRange } from "@components/PluginSettings/components";
+import { ChannelStore, GuildMemberStore, GuildStore } from "@webpack/common";
+import { Logger } from "@utils/Logger";
 
 // Calculate a CSS color string based on the user ID
 function calculateNameColorForUser(color: string) {
@@ -54,6 +56,12 @@ const settings = definePluginSettings({
     },
     MemberListColors: {
         description: "Replace role colors in the member list.",
+        restartNeeded: true,
+        type: OptionType.BOOLEAN,
+        default: true
+    },
+    VoiceListColors: {
+        description: "Replace role colors in the voice list.",
         restartNeeded: true,
         type: OptionType.BOOLEAN,
         default: true
@@ -170,7 +178,17 @@ export default definePlugin({
                 replace: "color:$self.calculateNameColorForListContext(arguments[0]),originalColor:"
             },
             predicate: () => settings.store.MemberListColors
-        }
+        },
+        {
+            find: ".usernameSpeaking]:",
+            replacement: [
+                {
+                    match: /\.usernameSpeaking\]:.+?,(?=children)(?<=guildId:(\i),.+?user:(\i).+?)/,
+                    replace: "$&style:$self.calculateNameColorForVoiceContext($2.id,$1),"
+                }
+            ],
+            predicate: () => settings.store.VoiceListColors
+        },
     ],
 
     calculateNameColorForMessageContext(context: any) {
@@ -205,5 +223,28 @@ export default definePlugin({
         return (colorString && luminance)
             ? newColorString
             : colorString;
+    },
+
+    calculateNameColorForVoiceContext(userId: string, channelOrGuildId: string) {
+        const colorString = this.getColorString(userId, channelOrGuildId);
+        const luminance = calculateNameColorForUser(colorString);
+        const newColorString = lighten(colorString);
+
+        if (luminance)
+            return newColorString && { color: newColorString };
+        else return colorString && { color: colorString };
+    },
+
+    getColorString(userId: string, channelOrGuildId: string) {
+        try {
+            const guildId = ChannelStore.getChannel(channelOrGuildId)?.guild_id ?? GuildStore.getGuild(channelOrGuildId)?.id;
+            if (guildId == null) return null;
+
+            return GuildMemberStore.getMember(guildId, userId)?.colorString ?? null;
+        } catch (e) {
+            new Logger("RoleColorEverywhere").error("Failed to get color string", e);
+        }
+
+        return null;
     },
 });
