@@ -19,27 +19,8 @@
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { makeRange } from "@components/PluginSettings/components";
-import { ChannelStore, GuildMemberStore, GuildStore } from "@webpack/common";
+import { ChannelStore, Forms, GuildMemberStore, GuildStore } from "@webpack/common";
 import { Logger } from "@utils/Logger";
-
-// Calculate a CSS color string based on the user ID
-function calculateNameColorForUser(color: string) {
-    if (!/^#[0-9A-F]{6}$/i.test(color)) return false;
-
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    const lum = luminance(r, g, b);
-    return lum < settings.store.SetLuminanceThreshold / 100;
-}
-
-function luminance(r: number, g: number, b: number): number {
-    const a = [r, g, b].map(v => {
-        v /= 255;
-        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    });
-    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
-}
 
 const settings = definePluginSettings({
     SetLuminanceThreshold: {
@@ -48,7 +29,7 @@ const settings = definePluginSettings({
         markers: makeRange(5, 30, 5),
         default: 15
     },
-    setLuminanceAmount: {
+    SetLuminanceAmount: {
         description: "Set the luminance the role colors should be set to.",
         type: OptionType.SLIDER,
         markers: makeRange(50, 90, 5),
@@ -60,20 +41,39 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true
     },
-    VoiceListColors: {
-        description: "Replace role colors in the voice list.",
-        restartNeeded: true,
+    RoleColorEverywhereIntegration: {
+        description: "RoleColorEverywhere Options",
+        type: OptionType.COMPONENT,
+        default: "",
+        component: lineBreak
+    },
+    ChatMentions: {
         type: OptionType.BOOLEAN,
-        default: true
+        default: true,
+        description: "Show role colors in chat mentions (including in the message box)",
+        restartNeeded: true
+    },
+    VoiceUsers: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "Show role colors in the voice chat user list",
+        restartNeeded: true
     },
 });
+
+function lineBreak() {
+    return (<><div>
+        <Forms.FormTitle tag="h1">RoleColorEverywhere Integration</Forms.FormTitle>
+    </div></>)
+}
 
 function lighten(color) {
     if (color) {
         var { hue, saturation, lightness } = hexToHSL(color);
-        const newHex = HSLToHex(hue, saturation, settings.store.setLuminanceAmount);
+        const newHex = HSLToHex(hue, saturation, (lightness < 50 ? settings.store.SetLuminanceAmount : lightness));
         return newHex
     }
+    return "#FFFFFF";
 }
 
 function HSLToHex(h, s, l) {
@@ -179,6 +179,18 @@ export default definePlugin({
             },
             predicate: () => settings.store.MemberListColors
         },
+        // Chat Mentions
+        {
+            find: ".USER_MENTION)",
+            replacement: [
+                {
+                    match: /(?<=onContextMenu:\i,color:)\i(?<=\.getNickname\((\i),\i,(\i).+?)/,
+                    replace: "$self.calculateNameColorForMentions($2?.id,$1)",
+                }
+            ],
+            predicate: () => settings.store.ChatMentions
+        },
+        // Voice Users
         {
             find: ".usernameSpeaking]:",
             replacement: [
@@ -187,14 +199,13 @@ export default definePlugin({
                     replace: "$&style:$self.calculateNameColorForVoiceContext($2.id,$1),"
                 }
             ],
-            predicate: () => settings.store.VoiceListColors
+            predicate: () => settings.store.VoiceUsers
         },
     ],
 
     calculateNameColorForMessageContext(context: any) {
         const userId: string | undefined = context?.message?.author?.id;
         const colorString = context?.author?.colorString;
-        const luminance = calculateNameColorForUser(colorString);
 
         // Color preview in role settings
         if (context?.message?.channel_id === "1337" && userId === "313337")
@@ -203,36 +214,34 @@ export default definePlugin({
         if (context?.channel?.isPrivate()) {
             return colorString;
         }
-        const newColorString = lighten(colorString);
+        const newColorString = colorString ? lighten(colorString) : colorString;
 
-        return (colorString && luminance)
-            ? newColorString
-            : colorString;
+        return newColorString;
     },
 
     calculateNameColorForListContext(context: any) {
         const colorString = context?.colorString;
-        const luminance = calculateNameColorForUser(colorString);
 
         if (context?.channel?.isPrivate()) {
             return colorString;
         }
-        const newColorString = lighten(colorString);
+        const newColorString = colorString ? lighten(colorString) : colorString;
 
-
-        return (colorString && luminance)
-            ? newColorString
-            : colorString;
+        return newColorString;
     },
 
     calculateNameColorForVoiceContext(userId: string, channelOrGuildId: string) {
         const colorString = this.getColorString(userId, channelOrGuildId);
-        const luminance = calculateNameColorForUser(colorString);
-        const newColorString = lighten(colorString);
+        const newColorString = colorString ? lighten(colorString) : colorString;
 
-        if (luminance)
-            return newColorString && { color: newColorString };
-        else return colorString && { color: colorString };
+        return newColorString && { color: newColorString };
+    },
+
+    calculateNameColorForMentions(userId: string, channelOrGuildId: string) {
+        const colorString = this.getColorString(userId, channelOrGuildId);
+        const newColorString = colorString ? lighten(colorString) : colorString;
+
+        return newColorString && parseInt(newColorString!.slice(1), 16);
     },
 
     getColorString(userId: string, channelOrGuildId: string) {
