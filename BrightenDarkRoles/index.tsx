@@ -26,7 +26,7 @@ const settings = definePluginSettings({
     SetLuminanceThreshold: {
         description: "Set threshold of luminance to be brightened.",
         type: OptionType.SLIDER,
-        markers: makeRange(5, 30, 5),
+        markers: makeRange(5, 40, 5),
         default: 15
     },
     SetLuminanceAmount: {
@@ -255,7 +255,6 @@ export default definePlugin({
     },
 
     calculateNameColorForRoleMentions(context) {
-        console.log(context);
         const colorString = context?.colorString;
 
         // Color preview in role settings
@@ -266,7 +265,6 @@ export default definePlugin({
             return colorString;
         }
         const newColorString = colorString ? lighten(colorString) : colorString;
-        console.log(newColorString);
 
         return newColorString && parseInt(newColorString!.slice(1), 16);
     },
