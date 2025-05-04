@@ -67,15 +67,32 @@ function lineBreak() {
     </div></>)
 }
 
+function getNameColor(color: string) {
+    if (!/^#[0-9A-F]{6}$/i.test(color)) return false;
+
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    const lum = luminance(r, g, b);
+    return lum < settings.store.SetLuminanceThreshold / 100;
+}
+
+function luminance(r: number, g: number, b: number): number {
+    const a = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
 function lighten(color) {
     if (color) {
-        var { hue, saturation, lightness } = hexToHSL(color);
-        const newHex = HSLToHex(hue, saturation, (lightness < settings.store.SetLuminanceThreshold ? settings.store.SetLuminanceAmount : lightness));
+        const { hue, saturation, lightness } = hexToHSL(color);
+        const newHex = HSLToHex(hue, saturation, (getNameColor(color) ? settings.store.SetLuminanceAmount : lightness));
         return newHex
     }
     return "#FFFFFF";
 }
-
 function HSLToHex(h, s, l) {
     s /= 100;
     l /= 100;
