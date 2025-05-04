@@ -185,9 +185,19 @@ export default definePlugin({
             replacement: [
                 {
                     match: /(?<=onContextMenu:\i,color:)\i(?<=\.getNickname\((\i),\i,(\i).+?)/,
-                    replace: "$self.calculateNameColorForMentions($2?.id,$1)",
+                    replace: "$self.calculateNameColorForUserMentions($2?.id,$1)",
                 }
             ],
+            predicate: () => settings.store.ChatMentions
+        },
+
+        // Role Mentions
+        {
+            find: ".ROLE_MENTION)",
+            replacement: {
+                match: /(?<=roleMention,color:\i\?)\i/,
+                replace: "$self.calculateNameColorForRoleMentions(arguments[0])"
+            },
             predicate: () => settings.store.ChatMentions
         },
         // Voice Users
@@ -237,9 +247,26 @@ export default definePlugin({
         return newColorString && { color: newColorString };
     },
 
-    calculateNameColorForMentions(userId: string, channelOrGuildId: string) {
+    calculateNameColorForUserMentions(userId: string, channelOrGuildId: string) {
         const colorString = this.getColorString(userId, channelOrGuildId);
         const newColorString = colorString ? lighten(colorString) : colorString;
+
+        return newColorString && parseInt(newColorString!.slice(1), 16);
+    },
+
+    calculateNameColorForRoleMentions(context) {
+        console.log(context);
+        const colorString = context?.colorString;
+
+        // Color preview in role settings
+        if (context?.message?.channel_id === "1337")
+            return colorString;
+
+        if (context?.channel?.isPrivate()) {
+            return colorString;
+        }
+        const newColorString = colorString ? lighten(colorString) : colorString;
+        console.log(newColorString);
 
         return newColorString && parseInt(newColorString!.slice(1), 16);
     },
