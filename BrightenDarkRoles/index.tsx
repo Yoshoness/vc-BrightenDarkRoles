@@ -70,7 +70,7 @@ function lineBreak() {
 function lighten(color) {
     if (color) {
         var { hue, saturation, lightness } = hexToHSL(color);
-        const newHex = HSLToHex(hue, saturation, (lightness < 50 ? settings.store.SetLuminanceAmount : lightness));
+        const newHex = HSLToHex(hue, saturation, (lightness < settings.store.SetLuminanceThreshold ? settings.store.SetLuminanceAmount : lightness));
         return newHex
     }
     return "#FFFFFF";
