@@ -16,11 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//import "./style.css";
+
 import { definePluginSettings } from "@api/Settings";
-import definePlugin, { OptionType } from "@utils/types";
-import { makeRange } from "@components/PluginSettings/components";
-import { ChannelStore, Forms, GuildMemberStore, GuildStore } from "@webpack/common";
-import { Logger } from "@utils/Logger";
+import definePlugin, { OptionType, makeRange } from "@utils/types";
+import { ChannelStore, GuildMemberStore, GuildStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     SetLuminanceThreshold: {
@@ -41,31 +41,7 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true
     },
-    RoleColorEverywhereIntegration: {
-        description: "RoleColorEverywhere Options",
-        type: OptionType.COMPONENT,
-        default: "",
-        component: lineBreak
-    },
-    ChatMentions: {
-        type: OptionType.BOOLEAN,
-        default: true,
-        description: "Show role colors in chat mentions (including in the message box)",
-        restartNeeded: true
-    },
-    VoiceUsers: {
-        type: OptionType.BOOLEAN,
-        default: true,
-        description: "Show role colors in the voice chat user list",
-        restartNeeded: true
-    },
 });
-
-function lineBreak() {
-    return (<><div>
-        <Forms.FormTitle tag="h1">RoleColorEverywhere Integration</Forms.FormTitle>
-    </div></>)
-}
 
 function getNameColor(color: string) {
     if (!/^#[0-9A-F]{6}$/i.test(color)) return false;
@@ -133,6 +109,7 @@ function HSLToHex(h, s, l) {
     return "#" + r + g + b;
 }
 
+
 function hexToHSL(hexCode: string) {
     // Hex => RGB normalized to 0-1
     const r = parseInt(hexCode.substring(1, 3), 16) / 255;
@@ -184,106 +161,137 @@ export default definePlugin({
         {
             find: '="SYSTEM_TAG"',
             replacement: {
-                match: /(style:)(.{0,500}textDecorationColor)/,
-                replace: "$1{color:$self.calculateNameColorForMessageContext(arguments[0])},_style:$2"
+                match: /(?<=colorString:\i,colorStrings:\i,colorRoleName:\i,displayNameStyles:\i}=)(\i)/,
+                replace: "$self.setMessageListColor($1, arguments[0])"
             }
         },
+
         {
             find: "#{intl::GUILD_OWNER}),children:",
             replacement: {
-                match: /(?<=roleName:\i,)color:/,
-                replace: "color:$self.calculateNameColorForListContext(arguments[0]),originalColor:"
+                match: /(?<=colorString:\i,colorStrings:\i,colorRoleName:\i,.*}=)(\i),/,
+                replace: "$self.setMessageListColor($1, arguments[0]),"
             },
             predicate: () => settings.store.MemberListColors
         },
+
         // Chat Mentions
         {
             find: ".USER_MENTION)",
             replacement: [
                 {
-                    match: /(?<=onContextMenu:\i,color:)\i(?<=\.getNickname\((\i),\i,(\i).+?)/,
-                    replace: "$self.calculateNameColorForUserMentions($2?.id,$1)",
+                    match: /Vencord\.Plugins\.plugins\[\"RoleColorEverywhere\"\]\.getColorInt\((\i)\?.id,([^,]+?)\)/,
+                    replace: "$self.setUserMentionColor($1?.id,$2)",
                 }
-            ],
-            predicate: () => settings.store.ChatMentions
+            ]
         },
 
         // Role Mentions
         {
             find: ".ROLE_MENTION)",
             replacement: {
-                match: /(?<=roleMention,color:\i\?)\i/,
-                replace: "$self.calculateNameColorForRoleMentions(arguments[0])"
-            },
-            predicate: () => settings.store.ChatMentions
+                match: /(?<=color:\i\?)(\i.color)/,
+                replace: "$self.setRoleMentionColor($1)"
+            }
         },
+
+        // "Replying To" label
+        {
+            find: ".replyLabel",
+            replacement: {
+                match: /(?<=color:)(\i)(.*)(?<=roleColors:)(\i)/,
+                replace: "$self.setReplyColor($1)$2$self.setReplyColor($3)"
+            }
+        },
+
+        // Boost Menu
+        {
+            find: ".boostMessageUser",
+            replacement: {
+                match: /(r.colorStrings)/,
+                replace: "$self.setBoostRoleColor($1)"
+            }
+        },
+
         // Voice Users
         {
             find: ".usernameSpeaking]:",
             replacement: [
                 {
                     match: /\.usernameSpeaking\]:.+?,(?=children)(?<=guildId:(\i),.+?user:(\i).+?)/,
-                    replace: "$&style:$self.calculateNameColorForVoiceContext($2.id,$1),"
+                    replace: "$&style:$self.setVoiceColor($2.id,$1),"
                 }
-            ],
-            predicate: () => settings.store.VoiceUsers
+            ]
         },
     ],
 
-    calculateNameColorForMessageContext(context: any) {
-        const userId: string | undefined = context?.message?.author?.id;
-        const colorString = context?.author?.colorString;
-
-        // Color preview in role settings
-        if (context?.message?.channel_id === "1337" && userId === "313337")
-            return colorString;
-
-        if (context?.channel?.isPrivate()) {
-            return colorString;
+    setBoostRoleColor(roleColors) {
+        for (const key in roleColors) {
+            roleColors[key] = roleColors[key] ? lighten(roleColors[key]) : undefined;
         }
-        const newColorString = colorString ? lighten(colorString) : colorString;
-
-        return newColorString;
+        return roleColors;
     },
 
-    calculateNameColorForListContext(context: any) {
-        const colorString = context?.colorString;
+    setMessageListColor(colorProps: { colorString: string, colorStrings?: Record<"primaryColor" | "secondaryColor" | "tertiaryColor", string>; }) {
+        try {
+            const colorString = lighten(colorProps.colorString);
+            for (const key in colorProps.colorStrings) {
+                colorProps.colorStrings[key] = colorProps.colorStrings[key] ? lighten(colorProps.colorStrings[key]) : undefined;
+            }
 
-        if (context?.channel?.isPrivate()) {
-            return colorString;
+            return {
+                ...colorProps,
+                colorString,
+                colorStrings: colorProps.colorStrings && colorProps.colorStrings
+            };
+        } catch (e) {
+            console.error("Failed to calculate message color strings:", e);
+            return colorProps;
         }
-        const newColorString = colorString ? lighten(colorString) : colorString;
-
-        return newColorString;
     },
 
-    calculateNameColorForVoiceContext(userId: string, channelOrGuildId: string) {
+    setVoiceColor(userId: string, channelOrGuildId: string) {
         const colorString = this.getColorString(userId, channelOrGuildId);
         const newColorString = colorString ? lighten(colorString) : colorString;
 
         return newColorString && { color: newColorString };
     },
 
-    calculateNameColorForUserMentions(userId: string, channelOrGuildId: string) {
+    setUserMentionColor(userId: string, channelOrGuildId: string) {
         const colorString = this.getColorString(userId, channelOrGuildId);
         const newColorString = colorString ? lighten(colorString) : colorString;
 
         return newColorString && parseInt(newColorString!.slice(1), 16);
     },
 
-    calculateNameColorForRoleMentions(context) {
-        const colorString = context?.colorString;
+    setReplyColor(colorString) {
+        try {
+            if (typeof colorString == "object") {
+                colorString.primaryColor = lighten(colorString.primaryColor);
+                colorString.secondaryColor = lighten(colorString.secondaryColor);
+                return colorString;
+            }
+            else if (typeof colorString == "string") {
+                return lighten(colorString);
+            }
+        } catch {
+            return colorString;
+        }
+    },
+
+    setRoleMentionColor(colorInt, context) {
+        const colorString = "#" + colorInt.toString(16).padStart(6, '0');
 
         // Color preview in role settings
         if (context?.message?.channel_id === "1337")
-            return colorString;
+            return colorInt;
 
         if (context?.channel?.isPrivate()) {
-            return colorString;
+            return colorInt;
         }
         const newColorString = colorString ? lighten(colorString) : colorString;
 
-        return newColorString && parseInt(newColorString!.slice(1), 16);
+        return Number("0x" + newColorString.substring(1));
     },
 
     getColorString(userId: string, channelOrGuildId: string) {
@@ -293,9 +301,17 @@ export default definePlugin({
 
             return GuildMemberStore.getMember(guildId, userId)?.colorString ?? null;
         } catch (e) {
-            new Logger("RoleColorEverywhere").error("Failed to get color string", e);
+            //new Logger("RoleColorEverywhere").error("Failed to get color string", e);
         }
 
         return null;
+    },
+
+    start() {
+
+    },
+
+    stop() {
+
     },
 });
