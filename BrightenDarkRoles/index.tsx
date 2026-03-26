@@ -158,6 +158,7 @@ export default definePlugin({
     settings,
 
     patches: [
+        // Display Name
         {
             find: '="SYSTEM_TAG"',
             replacement: {
@@ -166,11 +167,12 @@ export default definePlugin({
             }
         },
 
+        // Member List
         {
             find: "#{intl::GUILD_OWNER}),children:",
             replacement: {
-                match: /(?<=colorString:\i,colorStrings:\i,colorRoleName:\i,.*}=)(\i),/,
-                replace: "$self.setMessageListColor($1, arguments[0]),"
+                match: /(?<=colorString:\i,colorStrings:\i,colorRoleName:\i,.*}=)(\i)/,
+                replace: "$self.setMessageListColor($1, arguments[0])"
             },
             predicate: () => settings.store.MemberListColors
         },
@@ -178,12 +180,11 @@ export default definePlugin({
         // Chat Mentions
         {
             find: ".USER_MENTION)",
-            replacement: [
-                {
-                    match: /Vencord\.Plugins\.plugins\[\"RoleColorEverywhere\"\]\.getColorInt\((\i)\?.id,([^,]+?)\)/,
-                    replace: "$self.setUserMentionColor($1?.id,$2)",
-                }
-            ]
+            replacement:
+            {
+                match: /Vencord\.Plugins\.plugins\[\"RoleColorEverywhere\"\]\.getColorInt\((\i)\?.id,([^,]+?)\)/,
+                replace: "$self.setUserMentionColor($1?.id,$2)",
+            }
         },
 
         // Role Mentions
@@ -197,29 +198,29 @@ export default definePlugin({
 
         // "Replying To" label
         {
-            find: ".replyLabel",
+            find: "8E4GxS\"]",
             replacement: {
-                match: /(?<=color:)(\i)(.*)(?<=roleColors:)(\i)/,
-                replace: "$self.setReplyColor($1)$2$self.setReplyColor($3)"
+                match: /(?<=userHook.*(?:colorString):)(\i)/,
+                replace: "$self.setReplyColor($1)"
             }
         },
 
-        // Boost Menu
+        // Server Messages (Creating Threads/Boosting)
         {
-            find: ".boostMessageUser",
+            find: "d.A.roleStyle)",
             replacement: {
-                match: /(r.colorStrings)/,
-                replace: "$self.setBoostRoleColor($1)"
+                match: /(?<=colorString:\i,roleName:\i,dotAlignment:\i,.*}=)(\i)/,
+                replace: "$self.setMessageListColor($1, arguments[0])"
             }
         },
 
         // Voice Users
         {
-            find: ".usernameSpeaking]:",
+            find: "#{intl::GUEST_NAME_SUFFIX})]",
             replacement: [
                 {
-                    match: /\.usernameSpeaking\]:.+?,(?=children)(?<=guildId:(\i),.+?user:(\i).+?)/,
-                    replace: "$&style:$self.setVoiceColor($2.id,$1),"
+                    match: /Vencord\.Plugins\.plugins\[\"RoleColorEverywhere\"\]\.getColorStyle\((\i).id,([^,]+?)\)/,
+                    replace: "$self.setVoiceColor($1.id,$2)"
                 }
             ]
         },
@@ -232,7 +233,8 @@ export default definePlugin({
         return roleColors;
     },
 
-    setMessageListColor(colorProps: { colorString: string, colorStrings?: Record<"primaryColor" | "secondaryColor" | "tertiaryColor", string>; }) {
+    setMessageListColor(colorProps: { colorString: string, colorStrings?: Record<"primaryColor" | "secondaryColor" | "tertiaryColor", string> }) {
+
         try {
             const colorString = lighten(colorProps.colorString);
             for (const key in colorProps.colorStrings) {
@@ -265,18 +267,7 @@ export default definePlugin({
     },
 
     setReplyColor(colorString) {
-        try {
-            if (typeof colorString == "object") {
-                colorString.primaryColor = lighten(colorString.primaryColor);
-                colorString.secondaryColor = lighten(colorString.secondaryColor);
-                return colorString;
-            }
-            else if (typeof colorString == "string") {
-                return lighten(colorString);
-            }
-        } catch {
-            return colorString;
-        }
+        return lighten(colorString);
     },
 
     setRoleMentionColor(colorInt, context) {
@@ -306,11 +297,9 @@ export default definePlugin({
 
         return null;
     },
-
     start() {
 
     },
-
     stop() {
 
     },
